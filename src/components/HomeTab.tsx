@@ -78,7 +78,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </div>
           <div className="max-w-md mx-auto space-y-2">
             <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100">
-              مرحباً بك في تطبيق بيانات الأسرة
+              مرحباً بك في تطبيق رحلة أسرتي
             </h2>
             <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
               احسب أعمار أفراد أسرتك باليوم والشهر والسنة، ومدة الزواج، وأعمار الأبوين عند كل ولادة، وفوارق الأعمار وخط زمني ممتع.

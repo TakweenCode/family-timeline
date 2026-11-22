@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="flex flex-col min-w-0">
             <h1 className="text-base font-bold text-stone-900 dark:text-stone-100 tracking-tight leading-tight truncate">
-              بيانات الأسرة
+              رحلة أسرتي
             </h1>
             <span className="text-[11px] text-stone-500 dark:text-stone-400 leading-none truncate">
               حاسبة الأعمار والتواريخ
