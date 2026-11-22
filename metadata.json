@@ -1,0 +1,6 @@
+{
+  "name": "بيانات الأسرة - حاسبة أعمار وتواريخ العائلة",
+  "description": "تطبيق متكامل ومخصص للجوالات لحساب أعمار أفراد الأسرة، مدة الزواج، أعمار الأبوين عند كل ولادة، فوارق الأعمار وخط زمني تفاعلي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
