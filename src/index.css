@@ -19,10 +19,19 @@
 
 /* Print Styles */
 @media print {
+  @page {
+    margin: 12mm;
+  }
+  html,
   body {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #1c1917 !important;
     padding: 0 !important;
+    color-scheme: light !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
   }
   .no-print {
     display: none !important;

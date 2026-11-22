@@ -11,7 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { FamilyCalculations, FamilyState } from '../types';
-import { formatAge, formatDateArabic } from '../utils/calc';
+import { formatAge, formatDateArabic, formatWeekday } from '../utils/calc';
 
 interface HomeTabProps {
   state: FamilyState;
@@ -37,37 +37,71 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   const hasAnyData =
     Boolean(state.fatherName || state.fatherBirth || state.motherName || state.motherBirth || state.weddingDate || (state.children && state.children.length > 0));
 
+  const todayDate = calc.now;
+  const todayWeekday = formatWeekday(todayDate);
+  const todayGregorianText = formatDateArabic(todayDate);
+  const todayGregorianNumeric = `${todayDate.getFullYear()}/${String(
+    todayDate.getMonth() + 1
+  ).padStart(2, '0')}/${String(todayDate.getDate()).padStart(2, '0')}`;
+
+  const renderTodayBar = () => (
+    <div className="bg-white dark:bg-stone-900 rounded-2xl px-3.5 py-2.5 border border-stone-200 dark:border-stone-800 shadow-sm flex items-center justify-between gap-2 transition-colors">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
+          <Calendar className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 text-right">
+          <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-tight">
+            تاريخ اليوم الميلادي
+          </div>
+          <div className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 truncate">
+            {todayWeekday}، {todayGregorianText}
+          </div>
+        </div>
+      </div>
+      <span
+        dir="ltr"
+        className="text-[11px] font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2.5 py-1 rounded-lg tabular-nums shrink-0"
+      >
+        {todayGregorianNumeric}
+      </span>
+    </div>
+  );
+
   if (!hasAnyData) {
     return (
-      <div className="py-8 px-4 text-center space-y-6">
-        <div className="w-20 h-20 mx-auto rounded-3xl bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 flex items-center justify-center text-3xl shadow-inner">
-          👨‍👩‍👧‍👦
-        </div>
-        <div className="max-w-md mx-auto space-y-2">
-          <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100">
-            مرحباً بك في تطبيق بيانات الأسرة
-          </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
-            احسب أعمار أفراد أسرتك باليوم والشهر والسنة، ومدة الزواج، وأعمار الأبوين عند كل ولادة، وفوارق الأعمار وخط زمني ممتع.
-          </p>
-        </div>
+      <div className="space-y-6 pb-10">
+        {renderTodayBar()}
+        <div className="py-6 px-4 text-center space-y-6">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 flex items-center justify-center text-3xl shadow-inner">
+            👨‍👩‍👧‍👦
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100">
+              مرحباً بك في تطبيق بيانات الأسرة
+            </h2>
+            <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
+              احسب أعمار أفراد أسرتك باليوم والشهر والسنة، ومدة الزواج، وأعمار الأبوين عند كل ولادة، وفوارق الأعمار وخط زمني ممتع.
+            </p>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 max-w-xs mx-auto pt-2">
-          <button
-            onClick={onGoToEntry}
-            type="button"
-            className="w-full min-h-[48px] rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-teal-700/20 transition-all flex items-center justify-center gap-2"
-          >
-            <span>بدء إدخال بيانات أسرتك</span>
-          </button>
-          <button
-            onClick={onLoadSample}
-            type="button"
-            className="w-full min-h-[48px] rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 active:scale-[0.98] text-stone-800 dark:text-stone-200 font-semibold text-sm transition-all flex items-center justify-center gap-1.5 border border-stone-200 dark:border-stone-700"
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>تجربة بيانات توضيحية</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 max-w-xs mx-auto pt-2">
+            <button
+              onClick={onGoToEntry}
+              type="button"
+              className="w-full min-h-[48px] rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-teal-700/20 transition-all flex items-center justify-center gap-2"
+            >
+              <span>بدء إدخال بيانات أسرتك</span>
+            </button>
+            <button
+              onClick={onLoadSample}
+              type="button"
+              className="w-full min-h-[48px] rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 active:scale-[0.98] text-stone-800 dark:text-stone-200 font-semibold text-sm transition-all flex items-center justify-center gap-1.5 border border-stone-200 dark:border-stone-700"
+            >
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>تجربة بيانات توضيحية</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -75,6 +109,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="space-y-4 pb-20">
+      {/* Today Date & Weekday Bar */}
+      {renderTodayBar()}
+
       {/* Wedding & Anniversary Hero Banner */}
       {calc.weddingDate && calc.marriageDuration && !calc.marriageDuration.neg ? (
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 text-white p-5 shadow-lg shadow-teal-900/20">
@@ -86,7 +123,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             <div className="flex items-center justify-between text-teal-100 text-xs font-medium">
               <span className="flex items-center gap-1.5">
                 <Heart className="w-3.5 h-3.5 fill-teal-300 text-teal-300" />
-                <span>مدة الزواج المبارك</span>
+                <span>رحلتنا معاً</span>
               </span>
               <span className="opacity-90">{formatDateArabic(calc.weddingDate)}</span>
             </div>

@@ -100,6 +100,14 @@ export default function App() {
     }));
   };
 
+  // Batch update for parents and wedding date
+  const handleUpdateParents = (updates: Partial<FamilyState>) => {
+    setState((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+  };
+
   // Timeline year scrubber update
   const handleUpdateTimelineYear = (year: number) => {
     setState((prev) => ({
@@ -224,6 +232,7 @@ export default function App() {
             state={state}
             calc={calc}
             onUpdateField={handleUpdateField}
+            onUpdateParents={handleUpdateParents}
             onOpenAddChild={handleOpenAddChild}
             onDeleteChild={handleDeleteChild}
             onRestoreBackup={handleRestoreBackup}

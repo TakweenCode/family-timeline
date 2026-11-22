@@ -1,5 +1,5 @@
-import React from 'react';
-import { Share2, Copy, Printer, Download, Sparkles, FileText, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Share2, Copy, Printer, Download, X, FileCode2, FileText } from 'lucide-react';
 import { FamilyCalculations, FamilyState } from '../types';
 import { generateTextReport, formatDateArabic, formatAge, formatYearsDecimal } from '../utils/calc';
 import { downloadFile } from '../utils/storage';
@@ -17,6 +17,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   onGoToEntry,
   onShowToast,
 }) => {
+  const [showPrintFallback, setShowPrintFallback] = useState(false);
   const reportText = generateTextReport(state, calc);
 
   const hasData = Boolean(
@@ -78,16 +79,133 @@ export const ReportTab: React.FC<ReportTabProps> = ({
     onShowToast('تم تنزيل ملف التقرير النصي', 'success');
   };
 
+  const buildPrintableHtml = () => {
+    const escapedText = reportText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تقرير بيانات الأسرة</title>
+  <style>
+    @page { margin: 14mm; }
+    body {
+      font-family: Tahoma, Arial, system-ui, sans-serif;
+      background: #ffffff;
+      color: #1c1917;
+      max-width: 720px;
+      margin: 24px auto;
+      padding: 0 16px;
+      line-height: 1.85;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .btn {
+      background: #0d9488;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .card {
+      border: 1px solid #e7e5e4;
+      border-radius: 16px;
+      padding: 20px;
+      background: #fafaf9;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      color: #0f766e;
+    }
+    pre {
+      white-space: pre-wrap;
+      font-family: inherit;
+      font-size: 14px;
+      margin: 0;
+    }
+    @media print {
+      .actions { display: none; }
+      body { margin: 0; padding: 0; }
+      .card { border: none; background: #fff; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="actions">
+    <button class="btn" onclick="window.print()">طباعة / حفظ PDF</button>
+  </div>
+  <div class="card">
+    <h1>تقرير بيانات الأسرة</h1>
+    <pre>${escapedText}</pre>
+  </div>
+</body>
+</html>`;
+  };
+
+  const handleDownloadPrintableHtml = () => {
+    if (!reportText) return;
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadFile(`family-report-${dateStr}.html`, buildPrintableHtml(), 'text/html;charset=utf-8');
+    setShowPrintFallback(false);
+    onShowToast('تم تنزيل صفحة الطباعة، افتحها في المتصفح للطباعة أو الحفظ كـ PDF', 'success');
+  };
+
   const handlePrint = () => {
     if (!reportText) {
       onShowToast('يرجى إدخال بيانات الأسرة أولاً', 'error');
       return;
     }
+
+    const htmlEl = document.documentElement;
+    const wasDark = htmlEl.classList.contains('dark');
+    if (wasDark) {
+      htmlEl.classList.remove('dark');
+    }
+
+    let printTriggered = false;
+    const restoreTheme = () => {
+      if (wasDark) {
+        htmlEl.classList.add('dark');
+      }
+    };
+    const onBeforePrint = () => {
+      printTriggered = true;
+    };
+    const onAfterPrint = () => {
+      restoreTheme();
+    };
+
+    window.addEventListener('beforeprint', onBeforePrint, { once: true });
+    window.addEventListener('afterprint', onAfterPrint, { once: true });
+
     try {
       window.print();
     } catch {
-      onShowToast('الطباعة غير متاحة في هذا المتصفح، يمكنك نسخ التقرير', 'info');
+      restoreTheme();
+      window.removeEventListener('beforeprint', onBeforePrint);
+      window.removeEventListener('afterprint', onAfterPrint);
+      setShowPrintFallback(true);
+      return;
     }
+
+    window.setTimeout(() => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      if (!printTriggered) {
+        restoreTheme();
+        window.removeEventListener('afterprint', onAfterPrint);
+        setShowPrintFallback(true);
+      }
+    }, 350);
   };
 
   if (!hasData) {
@@ -114,7 +232,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-24 print:pb-0">
       {/* Mobile Action Buttons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 no-print">
         <button
@@ -382,6 +500,81 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           className="w-full p-3 text-xs text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 font-sans leading-relaxed select-all"
         />
       </div>
+
+      {/* Fallback Print Modal when browser/iframe/in-app webview blocks window.print() */}
+      {showPrintFallback && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="بدائل الطباعة وحفظ PDF"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150 no-print"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPrintFallback(false);
+          }}
+        >
+          <div className="w-full max-w-md bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border-t sm:border border-stone-200 dark:border-stone-800 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] space-y-4">
+            <div className="w-10 h-1.5 bg-stone-300 dark:bg-stone-700 rounded-full mx-auto sm:hidden" />
+
+            <div className="flex items-center justify-between pb-2 border-b border-stone-100 dark:border-stone-800">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">
+                  طباعة التقرير / حفظ PDF
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrintFallback(false)}
+                aria-label="إغلاق"
+                className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+              المتصفح الحالي أو نافذة المعاينة تمنع فتح نافذة الطباعة المباشرة. يمكنك استخدام أي من
+              البدائل التالية فوراً، أو فتح الرابط في متصفح Chrome أو Safari للطباعة المباشرة:
+            </p>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleDownloadPrintableHtml}
+                className="w-full min-h-[46px] px-4 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-[0.99] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm"
+              >
+                <FileCode2 className="w-4 h-4" />
+                <span>تنزيل صفحة جاهزة للطباعة (HTML / PDF)</span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadTxt();
+                    setShowPrintFallback(false);
+                  }}
+                  className="min-h-[44px] px-3 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-stone-200 dark:border-stone-700"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>حفظ كملف نصي</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCopy();
+                    setShowPrintFallback(false);
+                  }}
+                  className="min-h-[44px] px-3 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-stone-200 dark:border-stone-700"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>نسخ التقرير</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

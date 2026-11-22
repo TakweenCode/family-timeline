@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User,
   Calendar,
@@ -12,15 +12,19 @@ import {
   AlertTriangle,
   ShieldCheck,
   Sparkles,
+  Check,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
-import { Child, FamilyCalculations, FamilyState, Gender } from '../types';
-import { formatAge } from '../utils/calc';
+import { Child, FamilyCalculations, FamilyState } from '../types';
+import { calcAge, formatAge, formatDateArabic, parseDate } from '../utils/calc';
 import { exportBackupJSON, downloadFile } from '../utils/storage';
 
 interface EntryTabProps {
   state: FamilyState;
   calc: FamilyCalculations;
   onUpdateField: (field: keyof FamilyState, value: any) => void;
+  onUpdateParents: (updates: Partial<FamilyState>) => void;
   onOpenAddChild: (childToEdit?: Child) => void;
   onDeleteChild: (id: string) => void;
   onRestoreBackup: (jsonStr: string) => void;
@@ -32,7 +36,7 @@ interface EntryTabProps {
 export const EntryTab: React.FC<EntryTabProps> = ({
   state,
   calc,
-  onUpdateField,
+  onUpdateParents,
   onOpenAddChild,
   onDeleteChild,
   onRestoreBackup,
@@ -44,7 +48,117 @@ export const EntryTab: React.FC<EntryTabProps> = ({
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
   const [childToDelete, setChildToDelete] = useState<string | null>(null);
 
+  const hasSavedParents = Boolean(
+    state.fatherName ||
+      state.fatherBirth ||
+      state.motherName ||
+      state.motherBirth ||
+      state.weddingDate
+  );
+
+  // Local draft state for Father, Mother & Wedding Date
+  const [fatherName, setFatherName] = useState(state.fatherName);
+  const [fatherBirth, setFatherBirth] = useState(state.fatherBirth);
+  const [motherName, setMotherName] = useState(state.motherName);
+  const [motherBirth, setMotherBirth] = useState(state.motherBirth);
+  const [weddingDate, setWeddingDate] = useState(state.weddingDate);
+  const [isEditingParents, setIsEditingParents] = useState<boolean>(() => !hasSavedParents);
+
+  const lastSyncedKeyRef = useRef<string>(
+    `${state.fatherName}|${state.fatherBirth}|${state.motherName}|${state.motherBirth}|${state.weddingDate}`
+  );
+
+  // Keep draft synced when external actions update state (load sample, wipe all, restore backup)
+  useEffect(() => {
+    const nextKey = `${state.fatherName}|${state.fatherBirth}|${state.motherName}|${state.motherBirth}|${state.weddingDate}`;
+    if (nextKey !== lastSyncedKeyRef.current) {
+      lastSyncedKeyRef.current = nextKey;
+      setFatherName(state.fatherName);
+      setFatherBirth(state.fatherBirth);
+      setMotherName(state.motherName);
+      setMotherBirth(state.motherBirth);
+      setWeddingDate(state.weddingDate);
+
+      const hasAny = Boolean(
+        state.fatherName ||
+          state.fatherBirth ||
+          state.motherName ||
+          state.motherBirth ||
+          state.weddingDate
+      );
+      setIsEditingParents(!hasAny);
+    }
+  }, [
+    state.fatherName,
+    state.fatherBirth,
+    state.motherName,
+    state.motherBirth,
+    state.weddingDate,
+  ]);
+
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Live preview calculations while editing
+  const now = new Date();
+  const draftFatherDate = parseDate(fatherBirth);
+  const draftMotherDate = parseDate(motherBirth);
+  const draftWeddingDate = parseDate(weddingDate);
+  const draftFatherAge = draftFatherDate ? calcAge(draftFatherDate, now) : null;
+  const draftMotherAge = draftMotherDate ? calcAge(draftMotherDate, now) : null;
+  const draftMarriageDuration = draftWeddingDate ? calcAge(draftWeddingDate, now) : null;
+
+  const hasPendingChanges =
+    fatherName !== state.fatherName ||
+    fatherBirth !== state.fatherBirth ||
+    motherName !== state.motherName ||
+    motherBirth !== state.motherBirth ||
+    weddingDate !== state.weddingDate;
+
+  const handleSaveParents = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedFather = fatherName.trim();
+    const cleanedMother = motherName.trim();
+
+    if (
+      !cleanedFather &&
+      !fatherBirth &&
+      !cleanedMother &&
+      !motherBirth &&
+      !weddingDate
+    ) {
+      onShowToast('يرجى إدخال اسم أو تاريخ واحد على الأقل قبل الحفظ', 'error');
+      return;
+    }
+
+    const nextKey = `${cleanedFather}|${fatherBirth}|${cleanedMother}|${motherBirth}|${weddingDate}`;
+    lastSyncedKeyRef.current = nextKey;
+
+    onUpdateParents({
+      fatherName: cleanedFather,
+      fatherBirth,
+      motherName: cleanedMother,
+      motherBirth,
+      weddingDate,
+    });
+    setFatherName(cleanedFather);
+    setMotherName(cleanedMother);
+    setIsEditingParents(false);
+    onShowToast(
+      hasSavedParents
+        ? 'تم حفظ تعديلات بيانات الأبوين وعقد الزواج'
+        : 'تم حفظ بيانات الأبوين وعقد الزواج بنجاح',
+      'success'
+    );
+  };
+
+  const handleCancelParentsEdit = () => {
+    setFatherName(state.fatherName);
+    setFatherBirth(state.fatherBirth);
+    setMotherName(state.motherName);
+    setMotherBirth(state.motherBirth);
+    setWeddingDate(state.weddingDate);
+    setIsEditingParents(false);
+  };
 
   const handleCopyBackup = async () => {
     const json = exportBackupJSON(state);
@@ -102,111 +216,238 @@ export const EntryTab: React.FC<EntryTabProps> = ({
     <div className="space-y-5 pb-24">
       {/* Parents & Marriage Section */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl p-4 border border-stone-200 dark:border-stone-800 shadow-sm transition-colors space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-100 dark:border-stone-800">
-          <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-            <span>الأبوان وعقد الزواج</span>
-          </h2>
-          <span className="text-[11px] text-stone-400">البيانات تُحفظ تلقائياً</span>
-        </div>
-
-        {/* Father fields */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
-              <span>👨</span>
-              <span>بيانات الأب</span>
-            </label>
-            {calc.fatherAge && !calc.fatherAge.neg && (
-              <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400">
-                العمر: {formatAge(calc.fatherAge, true)}
+        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-stone-100 dark:border-stone-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 truncate">
+              الأبوان وعقد الزواج
+            </h2>
+            {!isEditingParents && hasSavedParents && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200/70 dark:border-emerald-800/50 shrink-0">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>محفوظ</span>
               </span>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div className="relative">
-              <input
-                type="text"
-                value={state.fatherName}
-                onChange={(e) => onUpdateField('fatherName', e.target.value)}
-                placeholder="اسم الأب..."
-                className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <User className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-            <div className="relative">
-              <input
-                type="date"
-                value={state.fatherBirth}
-                max={todayStr}
-                onChange={(e) => onUpdateField('fatherBirth', e.target.value)}
-                className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
+
+          {!isEditingParents && hasSavedParents ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingParents(true)}
+              className="min-h-[38px] px-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60 text-xs font-bold flex items-center gap-1.5 transition-colors active:scale-95 shrink-0"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>تعديل</span>
+            </button>
+          ) : (
+            <span className="text-[11px] font-medium text-stone-400 shrink-0">
+              {hasSavedParents ? 'وضع التعديل' : 'أدخل البيانات ثم احفظ'}
+            </span>
+          )}
         </div>
 
-        {/* Mother fields */}
-        <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
-              <span>👩</span>
-              <span>بيانات الأم</span>
-            </label>
-            {calc.motherAge && !calc.motherAge.neg && (
-              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
-                العمر: {formatAge(calc.motherAge, true)}
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div className="relative">
-              <input
-                type="text"
-                value={state.motherName}
-                onChange={(e) => onUpdateField('motherName', e.target.value)}
-                placeholder="اسم الأم..."
-                className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <User className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        {!isEditingParents && hasSavedParents ? (
+          /* Saved Read-Only Summary View */
+          <div className="space-y-2.5">
+            {/* Father Summary */}
+            <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/70 dark:border-stone-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">👨</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                    الأب: {state.fatherName || 'غير محدد'}
+                  </div>
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
+                    {calc.fatherDate
+                      ? formatDateArabic(calc.fatherDate)
+                      : 'لم يُحدد تاريخ الميلاد'}
+                  </div>
+                </div>
+              </div>
+              {calc.fatherAge && !calc.fatherAge.neg && (
+                <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 shrink-0 tabular-nums">
+                  {formatAge(calc.fatherAge, true)}
+                </span>
+              )}
             </div>
-            <div className="relative">
-              <input
-                type="date"
-                value={state.motherBirth}
-                max={todayStr}
-                onChange={(e) => onUpdateField('motherBirth', e.target.value)}
-                className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-        </div>
 
-        {/* Marriage Date */}
-        <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5 text-rose-500" />
-              <span>تاريخ الزواج</span>
-            </label>
-            {calc.marriageDuration && !calc.marriageDuration.neg && (
-              <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400">
-                المدة: {formatAge(calc.marriageDuration)}
-              </span>
-            )}
+            {/* Mother Summary */}
+            <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/70 dark:border-stone-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">👩</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                    الأم: {state.motherName || 'غير محدد'}
+                  </div>
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
+                    {calc.motherDate
+                      ? formatDateArabic(calc.motherDate)
+                      : 'لم يُحدد تاريخ الميلاد'}
+                  </div>
+                </div>
+              </div>
+              {calc.motherAge && !calc.motherAge.neg && (
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 shrink-0 tabular-nums">
+                  {formatAge(calc.motherAge, true)}
+                </span>
+              )}
+            </div>
+
+            {/* Wedding Date Summary */}
+            <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/70 dark:border-stone-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">💍</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-stone-900 dark:text-stone-100">
+                    عقد الزواج
+                  </div>
+                  <div className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
+                    {calc.weddingDate
+                      ? formatDateArabic(calc.weddingDate)
+                      : 'لم يُحدد تاريخ الزواج'}
+                  </div>
+                </div>
+              </div>
+              {calc.marriageDuration && !calc.marriageDuration.neg && (
+                <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 shrink-0 tabular-nums">
+                  {formatAge(calc.marriageDuration)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="relative max-w-sm">
-            <input
-              type="date"
-              value={state.weddingDate}
-              max={todayStr}
-              onChange={(e) => onUpdateField('weddingDate', e.target.value)}
-              className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-            <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
+        ) : (
+          /* Edit / Entry Form View */
+          <form onSubmit={handleSaveParents} className="space-y-4">
+            {/* Father fields */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                  <span>👨</span>
+                  <span>بيانات الأب</span>
+                </label>
+                {draftFatherAge && !draftFatherAge.neg && (
+                  <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 tabular-nums">
+                    العمر: {formatAge(draftFatherAge, true)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={fatherName}
+                    onChange={(e) => setFatherName(e.target.value)}
+                    placeholder="اسم الأب..."
+                    className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <User className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={fatherBirth}
+                    max={todayStr}
+                    onChange={(e) => setFatherBirth(e.target.value)}
+                    aria-label="تاريخ ميلاد الأب"
+                    className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Mother fields */}
+            <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                  <span>👩</span>
+                  <span>بيانات الأم</span>
+                </label>
+                {draftMotherAge && !draftMotherAge.neg && (
+                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 tabular-nums">
+                    العمر: {formatAge(draftMotherAge, true)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={motherName}
+                    onChange={(e) => setMotherName(e.target.value)}
+                    placeholder="اسم الأم..."
+                    className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <User className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={motherBirth}
+                    max={todayStr}
+                    onChange={(e) => setMotherBirth(e.target.value)}
+                    aria-label="تاريخ ميلاد الأم"
+                    className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Marriage Date */}
+            <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1">
+                  <Heart className="w-3.5 h-3.5 text-rose-500" />
+                  <span>تاريخ الزواج</span>
+                </label>
+                {draftMarriageDuration && !draftMarriageDuration.neg && (
+                  <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 tabular-nums">
+                    المدة: {formatAge(draftMarriageDuration)}
+                  </span>
+                )}
+              </div>
+              <div className="relative max-w-sm">
+                <input
+                  type="date"
+                  value={weddingDate}
+                  max={todayStr}
+                  onChange={(e) => setWeddingDate(e.target.value)}
+                  aria-label="تاريخ الزواج"
+                  className="w-full h-12 px-3 pr-9 text-base sm:text-sm font-medium text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Save / Cancel Action Buttons */}
+            <div className="pt-2 flex items-center gap-2.5">
+              <button
+                type="submit"
+                className="flex-1 min-h-[44px] px-4 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-md shadow-teal-700/20 transition-all"
+              >
+                <Check className="w-4 h-4" />
+                <span>
+                  {hasSavedParents
+                    ? hasPendingChanges
+                      ? 'حفظ التعديلات'
+                      : 'حفظ البيانات'
+                    : 'حفظ بيانات الأبوين'}
+                </span>
+              </button>
+
+              {hasSavedParents && (
+                <button
+                  type="button"
+                  onClick={handleCancelParentsEdit}
+                  className="min-h-[44px] px-4 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>إلغاء</span>
+                </button>
+              )}
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Children List Management */}
