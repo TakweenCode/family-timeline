@@ -1,11 +1,28 @@
-import React, { useEffect } from 'react';
-import { X, Sun, Moon, ShieldAlert, ExternalLink, Info, Smartphone } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Sun,
+  Moon,
+  ShieldAlert,
+  ExternalLink,
+  Info,
+  Smartphone,
+  Download,
+  CheckCircle2,
+  Share,
+  MoreVertical,
+} from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  isInstallable: boolean;
+  isInstalled: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+  onInstallApp: () => Promise<boolean>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -13,7 +30,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   theme,
   onToggleTheme,
+  isInstallable,
+  isInstalled,
+  isIOS,
+  isAndroid,
+  onInstallApp,
 }) => {
+  const [isInstalling, setIsInstalling] = useState(false);
+
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
@@ -27,6 +51,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  const handleInstallClick = async () => {
+    setIsInstalling(true);
+    try {
+      await onInstallApp();
+    } finally {
+      setIsInstalling(false);
+    }
+  };
 
   return (
     <div
@@ -56,7 +89,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 الإعدادات والمعلومات
               </h2>
               <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                تخصيص المظهر والتواصل وإخلاء المسؤولية
+                تخصيص المظهر، التثبيت، التواصل وإخلاء المسؤولية
               </p>
             </div>
           </div>
@@ -114,6 +147,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>الوضع الداكن</span>
               </button>
             </div>
+          </div>
+
+          {/* Install App (PWA) Section */}
+          <div className="p-4 rounded-2xl bg-teal-50/70 dark:bg-teal-950/25 border border-teal-200/80 dark:border-teal-800/60 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                <Download className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+                <span>تثبيت التطبيق</span>
+              </h3>
+              {isInstalled ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>مثبّت</span>
+                </span>
+              ) : isInstallable ? (
+                <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300">
+                  التثبيت المباشر متاح
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-stone-500 dark:text-stone-400">
+                  الشاشة الرئيسية (PWA)
+                </span>
+              )}
+            </div>
+
+            {isInstalled ? (
+              <div className="p-3 rounded-xl bg-white/80 dark:bg-stone-900/70 border border-emerald-200/70 dark:border-emerald-900/50 text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
+                التطبيق مثبّت حالياً على جهازك ويعمل كتطبيق مستقل من الشاشة الرئيسية، مع دعم العمل
+                حتى دون اتصال بالإنترنت.
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
+                  أضف «رحلة أسرتي» إلى الشاشة الرئيسية لهاتفك للوصول السريع كتطبيق مستقل والعمل بدون
+                  إنترنت.
+                </p>
+
+                {isInstallable && (
+                  <button
+                    type="button"
+                    disabled={isInstalling}
+                    onClick={handleInstallClick}
+                    className="w-full min-h-[46px] px-4 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-[0.98] disabled:opacity-60 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-teal-700/20 transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{isInstalling ? 'جارٍ التثبيت...' : 'تثبيت التطبيق الآن'}</span>
+                  </button>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* iPhone (Safari) Instructions */}
+                  <div
+                    className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                      isIOS
+                        ? 'bg-white dark:bg-stone-900 border-teal-300 dark:border-teal-700 ring-1 ring-teal-500/20'
+                        : 'bg-white/75 dark:bg-stone-900/60 border-stone-200/80 dark:border-stone-800'
+                    }`}
+                  >
+                    <div className="font-bold text-stone-900 dark:text-stone-100 flex items-center justify-between gap-1.5">
+                      <span>آيفون (سفاري)</span>
+                      <Share className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                    </div>
+                    <ol className="space-y-1 text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed list-decimal list-inside">
+                      <li>افتح الرابط في متصفح Safari.</li>
+                      <li>اضغط أيقونة المشاركة في الشريط السفلي.</li>
+                      <li>اختر «إضافة إلى الصفحة الرئيسية» ثم «إضافة».</li>
+                    </ol>
+                  </div>
+
+                  {/* Android (Chrome) Instructions */}
+                  <div
+                    className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                      isAndroid
+                        ? 'bg-white dark:bg-stone-900 border-teal-300 dark:border-teal-700 ring-1 ring-teal-500/20'
+                        : 'bg-white/75 dark:bg-stone-900/60 border-stone-200/80 dark:border-stone-800'
+                    }`}
+                  >
+                    <div className="font-bold text-stone-900 dark:text-stone-100 flex items-center justify-between gap-1.5">
+                      <span>أندرويد (كروم)</span>
+                      <MoreVertical className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                    </div>
+                    <ol className="space-y-1 text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed list-decimal list-inside">
+                      <li>اضغط زر «تثبيت التطبيق» أعلاه عند ظهوره.</li>
+                      <li>أو افتح قائمة المتصفح (⋮) بالأعلى.</li>
+                      <li>اختر «تثبيت التطبيق» أو «الإضافة للشاشة الرئيسية».</li>
+                    </ol>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Developer Contact Section (Telegram) */}

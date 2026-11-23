@@ -1,5 +1,5 @@
 import React from 'react';
-import { Moon, Sun, Sparkles, Share2, Settings } from 'lucide-react';
+import { Moon, Sun, Sparkles, Share2, Settings, Download } from 'lucide-react';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
@@ -8,6 +8,8 @@ interface HeaderProps {
   onLoadSample: () => void;
   hasData: boolean;
   onShareReport?: () => void;
+  isInstallable?: boolean;
+  onInstallApp?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLoadSample,
   hasData,
   onShareReport,
+  isInstallable = false,
+  onInstallApp,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full bg-white/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 transition-colors no-print">
@@ -47,6 +51,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>تجربة سريعة</span>
+            </button>
+          )}
+
+          {isInstallable && onInstallApp && (
+            <button
+              onClick={onInstallApp}
+              type="button"
+              className="min-w-[44px] min-h-[44px] px-2 rounded-xl flex items-center justify-center gap-1 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 border border-teal-200/80 dark:border-teal-800/60 transition-colors active:scale-95 focus-visible:outline-2 focus-visible:outline-teal-600"
+              title="تثبيت التطبيق"
+              aria-label="تثبيت التطبيق على الشاشة الرئيسية"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline text-xs font-bold">تثبيت</span>
             </button>
           )}
 

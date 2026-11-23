@@ -24,6 +24,8 @@ import { HomeTab } from './components/HomeTab';
 import { AnalyticsTab } from './components/AnalyticsTab';
 import { EntryTab } from './components/EntryTab';
 import { ReportTab } from './components/ReportTab';
+import { usePWAInstall } from './hooks/usePWAInstall';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 
 export default function App() {
   const [state, setState] = useState<FamilyState>(() => loadFamilyState());
@@ -38,6 +40,10 @@ export default function App() {
   const [isChildModalOpen, setIsChildModalOpen] = useState(false);
   const [childToEdit, setChildToEdit] = useState<Child | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // PWA install & offline status
+  const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
+  const isOnline = useOnlineStatus();
 
   // Prevent background body scroll when a modal is open on mobile
   useEffect(() => {
@@ -203,6 +209,10 @@ export default function App() {
         onLoadSample={handleLoadSample}
         hasData={hasData}
         onShareReport={() => setCurrentTab('report')}
+        isInstallable={isInstallable && !isInstalled}
+        onInstallApp={() => {
+          void install();
+        }}
       />
 
       {/* Main Content Viewport */}
@@ -266,7 +276,23 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         theme={theme}
         onToggleTheme={toggleTheme}
+        isInstallable={isInstallable}
+        isInstalled={isInstalled}
+        isIOS={isIOS}
+        isAndroid={isAndroid}
+        onInstallApp={install}
       />
+
+      {/* Non-intrusive Offline Mode Banner */}
+      {!isOnline && (
+        <div
+          role="status"
+          className="fixed right-3 bottom-[calc(70px+env(safe-area-inset-bottom,0px))] z-40 flex items-center gap-2 rounded-xl bg-amber-600 text-white px-3 py-1.5 text-[11px] font-bold shadow-lg no-print"
+        >
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+          <span>وضع عدم الاتصال — يتم استخدام النسخة المحفوظة</span>
+        </div>
+      )}
 
       {/* Toast Notification */}
       <Toast message={toast?.msg || null} type={toast?.type} />
